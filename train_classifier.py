@@ -16,12 +16,13 @@ import dataloader
 import modules
 
 class Model(nn.Module):
-    def __init__(self, embedding, hidden_size=150, depth=1, dropout=0.3, cnn=False, nclasses=2):
+    def __init__(self, embedding, hidden_size=150, depth=1, dropout=0.3, cnn=False, nclasses=2, args=None):
         super(Model, self).__init__()
         self.cnn = cnn
         self.drop = nn.Dropout(dropout)
+        self.args = args
         self.emb_layer = modules.EmbeddingLayer(
-            embs = dataloader.load_embedding(embedding)
+            embs = dataloader.load_embedding(embedding), dist_embeds = self.args.dist_embeds
         )
         self.word2id = self.emb_layer.word2id
 
@@ -55,7 +56,10 @@ class Model(nn.Module):
     def forward(self, input):
         if self.cnn:
             input = input.t()
-        emb, kl_loss = self.emb_layer(input)
+        if self.args.dist_embeds:
+            emb, kl_loss = self.emb_layer(input)
+        else: 
+            emb = self.emb_layer(input)
         emb = self.drop(emb)
 
         if self.cnn:
@@ -66,7 +70,11 @@ class Model(nn.Module):
             output = torch.max(output, dim=0)[0].squeeze()
 
         output = self.drop(output)
-        return self.out(output), kl_loss
+        if self.args.dist_embeds:
+            return self.out(output), kl_loss
+        else:
+            return self.out(output)
+
 
     def text_pred(self, text, batch_size=32):
         batches_x = dataloader.create_batches_x(
@@ -104,7 +112,10 @@ def eval_model(niter, model, input_x, input_y):
     with torch.no_grad():
         for x, y in zip(input_x, input_y):
             x, y = Variable(x, volatile=True), Variable(y)
-            output, kl_loss = model(x)
+            if model.args.dist_embeds:
+                output, kl_loss = model(x)
+            else:
+                output = model(x)
             # loss = criterion(output, y)
             # total_loss += loss.item()*x.size(1)
             pred = output.data.max(1)[1]
@@ -128,20 +139,37 @@ def train_model(epoch, model, optimizer,
         cnt += 1
         model.zero_grad()
         x, y = Variable(x), Variable(y)
-        output, kl_loss = model(x)
-        ce_loss = criterion(output, y)
-        loss = ce_loss + args.kl_weight*kl_loss
+
+        if model.args.dist_embeds:
+            output, kl_loss = model(x)
+            ce_loss = criterion(output, y)
+            loss = ce_loss + model.args.kl_weight*kl_loss
+
+        else:
+            output = model(x)
+            loss = criterion(output, y)
+
         loss.backward()
         optimizer.step()
 
     test_acc = eval_model(niter, model, test_x, test_y)
+    
+    if model.args.dist_embeds:
+       sys.stdout.write("Epoch={} iter={} lr={:.6f} train_loss_class={:.6f} train_loss_kl={:.6f} train_loss_ovr = {:.6f} test_err={:.6f}\n".format(
+           epoch, niter,
+           optimizer.param_groups[0]['lr'],
+           ce_loss.item(), kl_loss.item(), loss.item(),
+           test_acc
+       ))
 
-    sys.stdout.write("Epoch={} iter={} lr={:.6f} train_loss_class={:.6f} train_loss_kl={:.6f} train_loss_ovr = {:.6f} test_err={:.6f}\n".format(
-        epoch, niter,
-        optimizer.param_groups[0]['lr'],
-        ce_loss.item(), kl_loss.item(), loss.item(),
-        test_acc
-    ))
+    else:
+       sys.stdout.write("Epoch={} iter={} lr={:.6f} train_loss = {:.6f} test_err={:.6f}\n".format(
+           epoch, niter,
+           optimizer.param_groups[0]['lr'],
+           loss.item(),
+           test_acc
+       ))
+
 
     if test_acc > best_test:
         best_test = test_acc
@@ -213,7 +241,7 @@ def main(args):
     #         test_id = args.cv
     #     )
 
-    model = Model(args.embedding, args.d, args.depth, args.dropout, args.cnn, nclasses).cuda()
+    model = Model(args.embedding, args.d, args.depth, args.dropout, args.cnn, nclasses, args=args).cuda()
     need_grad = lambda x: x.requires_grad
     optimizer = optim.Adam(
         filter(need_grad, model.parameters()),
@@ -272,7 +300,8 @@ if __name__ == "__main__":
     argparser.add_argument("--save_path", type=str, default='')
     argparser.add_argument("--save_data_split", action='store_true', help="whether to save train/test split")
     argparser.add_argument("--gpu_id", type=int, default=0)
-    argparser.add_argument("--kl_loss", type=float, default = 0.001)
+    argparser.add_argument("--kl_weight", type=float, default = 0.001)
+    argparser.add_argument("--dist_embeds", action='store_true')
 
     args = argparser.parse_args()
     # args.save_path = os.path.join(args.save_path, args.dataset)

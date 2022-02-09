@@ -89,7 +89,7 @@ class EmbeddingLayer(nn.Module):
         epsilon = torch.unsqueeze(torch.randn((embed_mean.shape[0], embed_mean.shape[1])), dim=2)
         epsilon = epsilon.repeat((1,1,embed_mean.shape[2]))
         
-        embed = embed_mean + torch.exp(embed_var)*epsilon
+        embed = embed_mean + torch.exp(embed_var)*epsilon.cuda()
         return embed
 
     def kl_loss(self, embed_mean_1, embed_mean_2, embed_var_1, embed_var_2):
@@ -102,7 +102,7 @@ class EmbeddingLayer(nn.Module):
         embed_variance = self.embedding_variance(input)
         
         if self.dist_embeds:
-            kl_loss = self.kl_loss(embed_mean, embed_mean, embed_variance, torch.fill(embed_variance.shape, 1))
+            kl_loss = self.kl_loss(embed_mean, embed_mean, embed_variance, torch.full(embed_variance.shape, 0.5).cuda())
             return self.sample_embeds(embed_mean, embed_variance), kl_loss
             
         else:
