@@ -81,6 +81,13 @@ class EmbeddingLayer(nn.Module):
         
         self.embedding_variance = nn.Embedding(self.n_V, n_d)
 
+    
+    def sample_embeds(self, embed_mean, embed_var):
+        epsilon = torch.randn((embed_mean.shape[0], embed_mean.shape[1]))
+        embed = embed_mean + embed_var*epsilon
+        print('embed', embed.shape)
+        return embed
+
     def forward(self, input):
         print('embedding shape', self.embedding(input).shape)
         print('embedding variance shape', self.embedding_variance(input).shape)
