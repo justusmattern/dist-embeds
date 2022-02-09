@@ -31,7 +31,7 @@ class CNN_Text(nn.Module):
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, n_d=100, embs=None, fix_emb=True, oov='<oov>', pad='<pad>', normalize=True):
+    def __init__(self, n_d=100, embs=None, fix_emb=True, oov='<oov>', pad='<pad>', normalize=True, dist_embeds = False):
         super(EmbeddingLayer, self).__init__()
         word2id = {}
         if embs is not None:
@@ -83,13 +83,17 @@ class EmbeddingLayer(nn.Module):
 
     
     def sample_embeds(self, embed_mean, embed_var):
-        epsilon = torch.randn((embed_mean.shape[0], embed_mean.shape[1]))
+        epsilon = torch.unsqueeze(torch.randn((embed_mean.shape[0], embed_mean.shape[1])), dim=2)
+        epsilon = epsilon.repeat((1,1,embed_mean.shape[2]))
+        
         embed = embed_mean + torch.exp(embed_var)*epsilon
-        print('embed', embed.shape)
         return embed
 
     def forward(self, input):
         embed_mean = self.embedding(input)
         embed_variance = self.embedding_variance(input)
-
-        return self.sample_embeds(embed_mean, embed_variance)
+        
+        if self.dist_embeds:
+            return self.sample_embeds(embed_mean, embed_variance)
+        else:
+            return embed_mean

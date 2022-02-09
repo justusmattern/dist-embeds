@@ -167,8 +167,8 @@ def main(args):
     #     if args.save_data_split:
     #         save_data(train_x, train_y, args.path, 'train')
     #         save_data(test_x, test_y, args.path, 'test')
-        train_x, train_y = dataloader.read_corpus('/data/medg/misc/jindi/nlp/datasets/mr/train.txt')
-        test_x, test_y = dataloader.read_corpus('/data/medg/misc/jindi/nlp/datasets/mr/test.txt')
+        train_x, train_y = dataloader.read_corpus('data/mr/train.txt')
+        test_x, test_y = dataloader.read_corpus('data/mr/test.txt')
     elif args.dataset == 'imdb':
         train_x, train_y = dataloader.read_corpus(os.path.join('/data/medg/misc/jindi/nlp/datasets/imdb',
                                                                'train_tok.csv'),
