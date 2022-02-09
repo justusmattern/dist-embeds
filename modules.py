@@ -31,7 +31,7 @@ class CNN_Text(nn.Module):
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, n_d=100, embs=None, fix_emb=True, oov='<oov>', pad='<pad>', normalize=True, dist_embeds = False):
+    def __init__(self, n_d=100, embs=None, fix_emb=True, oov='<oov>', pad='<pad>', normalize=True, dist_embeds = False, target_var = 0.1):
         super(EmbeddingLayer, self).__init__()
         word2id = {}
         if embs is not None:
@@ -64,6 +64,9 @@ class EmbeddingLayer(nn.Module):
         self.embedding = nn.Embedding(self.n_V, n_d)
         self.embedding.weight.data.uniform_(-0.25, 0.25)
 
+        self.dist_embeds = dist_embeds
+        self.target_variance = target_var
+
         if embs is not None:
             weight  = self.embedding.weight
             weight.data[:len(embwords)].copy_(torch.from_numpy(embvecs))
@@ -89,11 +92,18 @@ class EmbeddingLayer(nn.Module):
         embed = embed_mean + torch.exp(embed_var)*epsilon
         return embed
 
+    def kl_loss(self, embed_mean_1, embed_mean_2, embed_var_1, embed_var_2):
+        exponential = embed_var_1 - embed_var_2 - torch.pow(embed_mean_1 - embed_mean_2, 2) / embed_var_2.exp() - torch.exp(embed_var_1 - embed_var_2) + 1
+        result = -0.5 * torch.sum(exponential, tuple(range(1, len(exponential.shape))))
+        return result.mean()
+
     def forward(self, input):
         embed_mean = self.embedding(input)
         embed_variance = self.embedding_variance(input)
         
         if self.dist_embeds:
-            return self.sample_embeds(embed_mean, embed_variance)
+            kl_loss = self.kl_loss(embed_mean, embed_mean, embed_variance, torch.fill(embed_variance.shape, 1))
+            return self.sample_embeds(embed_mean, embed_variance), kl_loss
+            
         else:
             return embed_mean

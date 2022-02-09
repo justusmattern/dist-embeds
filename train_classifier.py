@@ -55,7 +55,7 @@ class Model(nn.Module):
     def forward(self, input):
         if self.cnn:
             input = input.t()
-        emb = self.emb_layer(input)
+        emb, kl_loss = self.emb_layer(input)
         emb = self.drop(emb)
 
         if self.cnn:
@@ -66,7 +66,7 @@ class Model(nn.Module):
             output = torch.max(output, dim=0)[0].squeeze()
 
         output = self.drop(output)
-        return self.out(output)
+        return self.out(output), kl_loss
 
     def text_pred(self, text, batch_size=32):
         batches_x = dataloader.create_batches_x(
@@ -128,8 +128,8 @@ def train_model(epoch, model, optimizer,
         cnt += 1
         model.zero_grad()
         x, y = Variable(x), Variable(y)
-        output = model(x)
-        loss = criterion(output, y)
+        output, kl_loss = model(x)
+        loss = criterion(output, y) + args.kl_weight*kl_loss
         loss.backward()
         optimizer.step()
 
@@ -271,6 +271,7 @@ if __name__ == "__main__":
     argparser.add_argument("--save_path", type=str, default='')
     argparser.add_argument("--save_data_split", action='store_true', help="whether to save train/test split")
     argparser.add_argument("--gpu_id", type=int, default=0)
+    argparser.add_argument("--kl_loss", type=float, default = 0.001)
 
     args = argparser.parse_args()
     # args.save_path = os.path.join(args.save_path, args.dataset)
