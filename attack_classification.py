@@ -470,7 +470,7 @@ def main():
     # construct the model
     print("Building Model...")
     if args.target_model == 'wordLSTM':
-        model = Model(args.word_embeddings_path, nclasses=args.nclasses).cuda()
+        model = Model(args.word_embeddings_path, nclasses=args.nclasses, args=args).cuda()
         checkpoint = torch.load(args.target_model_path, map_location='cuda:0')
         model.load_state_dict(checkpoint)
     elif args.target_model == 'wordCNN':
