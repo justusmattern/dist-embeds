@@ -78,6 +78,10 @@ class EmbeddingLayer(nn.Module):
 
         if fix_emb:
             self.embedding.weight.requires_grad = False
+        
+        self.embedding_variance = nn.Embedding(self.n_V, n_d)
 
     def forward(self, input):
+        print('embedding shape', self.embedding(input).shape)
+        print('embedding variance shape', self.embedding_variance(input).shape)
         return self.embedding(input)
