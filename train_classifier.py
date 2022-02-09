@@ -104,7 +104,7 @@ def eval_model(niter, model, input_x, input_y):
     with torch.no_grad():
         for x, y in zip(input_x, input_y):
             x, y = Variable(x, volatile=True), Variable(y)
-            output = model(x)
+            output, kl_loss = model(x)
             # loss = criterion(output, y)
             # total_loss += loss.item()*x.size(1)
             pred = output.data.max(1)[1]
@@ -129,16 +129,17 @@ def train_model(epoch, model, optimizer,
         model.zero_grad()
         x, y = Variable(x), Variable(y)
         output, kl_loss = model(x)
-        loss = criterion(output, y) + args.kl_weight*kl_loss
+        ce_loss = criterion(output, y)
+        loss = ce_loss + args.kl_weight*kl_loss
         loss.backward()
         optimizer.step()
 
     test_acc = eval_model(niter, model, test_x, test_y)
 
-    sys.stdout.write("Epoch={} iter={} lr={:.6f} train_loss={:.6f} test_err={:.6f}\n".format(
+    sys.stdout.write("Epoch={} iter={} lr={:.6f} train_loss_class={:.6f} train_loss_kl={:.6f} train_loss_ovr = {:.6f} test_err={:.6f}\n".format(
         epoch, niter,
         optimizer.param_groups[0]['lr'],
-        loss.item(),
+        ce_loss.item(), kl_loss.item(), loss.item(),
         test_acc
     ))
 
